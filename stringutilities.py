@@ -15,7 +15,15 @@ import binascii
 import json
 import pprint
 
+if sys.version[0] == 2:
+    import urllib
+    url_quote = urllib.quote
+    url_unquote = urllib.unquote
 
+else:
+    import urllib.parse
+    url_quote = urllib.parse.quote
+    url_unquote = urllib.parse.unquote
 
 
 class ConvertTabsToSpacesCommand(sublime_plugin.TextCommand):
@@ -397,6 +405,19 @@ class StringUtilitiesDecodeJsonCommand(sublime_plugin.TextCommand):
 				self.i = self.i + 1
 				self.output += tabs(dpth) + str(self.i) + ' => %s' % src + "\n"
 
+
+class ConvertToUrlQuotedCommand(sublime_plugin.TextCommand):
+    def run(self, edit):
+        for region in self.view.sel():
+            if not region.empty():
+                self.view.replace(edit, region, url_quote(self.view.substr(region)))
+
+
+class ConvertFromUrlQuotedCommand(sublime_plugin.TextCommand):
+    def run(self, edit):
+        for region in self.view.sel():
+            if not region.empty():
+                self.view.replace(edit, region, url_unquote(self.view.substr(region)))
 
 
 class StringUtilitiesTestCommand(sublime_plugin.TextCommand):
