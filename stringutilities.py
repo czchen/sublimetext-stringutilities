@@ -1,3 +1,8 @@
+# @author          Avtandil Kikabidze
+# @copyright       Copyright (c) 2008-2016, Avtandil Kikabidze aka LONGMAN (akalongman@gmail.com)
+# @link            http://longman.me
+# @license         The MIT License (MIT)
+
 import sublime
 import sublime_plugin
 import string
@@ -5,7 +10,7 @@ import re
 import sys
 import time
 import base64
-import html.entities
+import html.entities as htmlentitydefs
 from cgi import escape
 from hashlib import md5,sha1
 from datetime import datetime
@@ -14,6 +19,10 @@ import os, socket, urllib
 import binascii
 import json
 import pprint
+
+if sys.hexversion >= 0x3000000:
+    def unichr(c):
+        return chr(c)
 
 if sys.version[0] == 2:
     import urllib
@@ -100,7 +109,7 @@ class ConvertToUnicodeNotationCommand(sublime_plugin.TextCommand):
             if not region.empty():
                 text = ''
                 for c in self.view.substr(region):
-                    if not re.match(pattern, c) and (c < 0x20 or c > 0x7e):
+                    if not re.match(pattern, c) and (ord(c) < 0x20 or ord(c) > 0x7e):
                         text += '\\u{0:04X}'.format(ord(c))
                     else:
                         text += c
@@ -126,7 +135,7 @@ class ConvertToBase64Command(sublime_plugin.TextCommand):
             if not region.empty():
                 text = self.view.substr(region).encode(self.enc())
                 t = base64.b64encode(text)
-                txt = str(t,'ascii')
+                txt = str(t, self.enc())
                 self.view.replace(edit, region, txt)
 
     def enc(self):
@@ -143,7 +152,7 @@ class ConvertFromBase64Command(sublime_plugin.TextCommand):
             if not region.empty():
                 text = self.view.substr(region).encode(self.enc())
                 t = base64.b64decode(text)
-                txt = str(t,'ascii')
+                txt = str(t, self.enc())
                 self.view.replace(edit, region, txt)
 
     def enc(self):
@@ -190,7 +199,7 @@ class ConvertHexToRgbCommand(sublime_plugin.TextCommand):
     def run(self, edit):
         for region in self.view.sel():
             if not region.empty():
-                text = self.view.substr(region).encode(self.enc())
+                text = self.view.substr(region)
                 self.view.replace(edit, region, self.hex_to_rgb(text))
 
     def enc(self):
@@ -203,7 +212,7 @@ class ConvertHexToRgbCommand(sublime_plugin.TextCommand):
         value = value.lstrip('#')
         lv = len(value)
         if lv == 6:
-            rgb = tuple(str(int(value[i:i+lv/3], 16)) for i in range(0, lv, lv/3))
+            rgb = tuple(str(int(value[i:i+lv//3], 16)) for i in range(0, lv, lv//3))
         if lv == 3:
             rgb = tuple(str(int(value[i:i+1], 16)*17) for i in range(0, 3))
         if lv == 1:
@@ -217,12 +226,12 @@ class ConvertRgbToHexCommand(sublime_plugin.TextCommand):
     def run(self, edit):
         for region in self.view.sel():
             if not region.empty():
-                text = self.view.substr(region).encode(self.enc())
+                text = self.view.substr(region)
                 str_len = len(text)
                 reg_rgb = '^rgb[a]?\((\s*\d+\s*),(\s*\d+\s*),(\s*\d+\s*),?(\s*(0?.?\d)+\s*)?\)$'
                 rgb_match = re.match(reg_rgb, text)
                 if rgb_match is not None:
-                	self.view.replace(edit, region, self.rgb_to_hex(rgb_match))
+                    self.view.replace(edit, region, self.rgb_to_hex(rgb_match))
 
     def enc(self):
         if self.view.encoding() == 'Undefined':
@@ -247,6 +256,41 @@ class ConvertRgbToHexCommand(sublime_plugin.TextCommand):
 
         # Return the proformatted string with the new values.
         return '#%s%s%s' % (val_1, val_2, val_3)
+
+
+class ConvertSingleQuotesToDoubleCommand(sublime_plugin.TextCommand):
+    def run(self, edit):
+        for region in self.view.sel():
+            if not region.empty():
+                text = self.view.substr(region)
+                text = text.replace("'", "\"")
+                self.view.replace(edit, region, text)
+
+class ConvertDoubleQuotesToSingleCommand(sublime_plugin.TextCommand):
+    def run(self, edit):
+        for region in self.view.sel():
+            if not region.empty():
+                text = self.view.substr(region)
+                text = text.replace("\"", "'")
+                self.view.replace(edit, region, text)
+
+class UrlDecodeCommand(sublime_plugin.TextCommand):
+    def run(self, edit):
+        for region in self.view.sel():
+            if not region.empty():
+                text = self.view.substr(region)
+                text = urllib.parse.unquote(text)
+                self.view.replace(edit, region, text)
+
+class UrlEncodeCommand(sublime_plugin.TextCommand):
+    def run(self, edit):
+        for region in self.view.sel():
+            if not region.empty():
+                text = self.view.substr(region)
+                text = urllib.parse.quote(text)
+                self.view.replace(edit, region, text)
+
+
 
 
 class ConvertMd5Command(sublime_plugin.TextCommand):
@@ -317,11 +361,11 @@ class InsertTimestampCommand(sublime_plugin.TextCommand):
 
 
 class GeneratePasswordCommand(sublime_plugin.TextCommand):
-	chars = "23456789abcdefghijkmnpqrstuvwxyzABCDEFGHKMNPQRSTUVWXYZ"
+    chars = "23456789abcdefghijkmnpqrstuvwxyzABCDEFGHKMNPQRSTUVWXYZ"
 
-	def run(self, edit, length=16):
-		length = int(length)
-		self.view.insert(edit, self.view.sel()[0].begin(), ''.join(sample(self.chars, length)))
+    def run(self, edit, length=16):
+        length = int(length)
+        self.view.insert(edit, self.view.sel()[0].begin(), ''.join(sample(self.chars, length)))
 
 
 class StringUtilitiesExtIpCommand(sublime_plugin.TextCommand):
@@ -354,56 +398,60 @@ class StringUtilitiesIntIpCommand(sublime_plugin.TextCommand):
             return self.view.encoding()
 
 
-
 class StringUtilitiesDecodeJsonCommand(sublime_plugin.TextCommand):
-	output = ""
-	i = 0
+    output = ""
+    i = 0
 
-	def run(self, edit):
-		for region in self.view.sel():
-			self.output = ""
-			if not region.empty():
-				text = self.view.substr(region).encode(self.enc())
-				text = str(text, 'utf8')
-				data = json.loads(text, encoding='utf8')
-				self.recursive_print(data)
+    def run(self, edit):
+        for region in self.view.sel():
+            self.output = ""
+            if not region.empty():
+                text = self.view.substr(region).encode(self.enc())
+                text = str(text, 'utf8')
+                data = json.loads(text, encoding='utf8')
+                output = json.dumps(data, indent=4, sort_keys=True)
 
-				#print(self.output)
+                self.view.replace(edit, region, output)
 
-				#pp = pprint.PrettyPrinter(indent=4, width=1)
-				#data = pp.pformat(data)
-				#data = self.output
-				#data = data.replace('{   ', '{')
-				#data = data.replace('{', '\n   {\n')
 
-				self.view.replace(edit, region, self.output)
+                #self.recursive_print(data)
 
-	def enc(self):
-		if self.view.encoding() == 'Undefined':
-			return self.view.settings().get('default_encoding', 'UTF-8')
-		else:
-			return self.view.encoding()
+                #print(self.output)
 
-	def recursive_print(self, src, dpth = 0, key = ''):
-		""" Recursively prints nested elements."""
-		tabs = lambda n: '\t' * n * 1 # or 2 or 8 or...
-		brace = lambda s, n: '%s%s%s' % ('['*n, s, ']'*n)
+                #pp = pprint.PrettyPrinter(indent=4, width=1)
+                #data = pp.pformat(data)
+                #data = self.output
+                #data = data.replace('{   ', '{')
+                #data = data.replace('{', '\n   {\n')
 
-		if isinstance(src, dict):
-			for key, value in src.items():
-				if isinstance(value, dict) or (isinstance(value, list)):
-					self.output += tabs(dpth) + brace(key, dpth) + "\n"
-				self.recursive_print(value, dpth + 1, key)
-		elif (isinstance(src, list)):
-			self.i = 0
-			for litem in src:
-				self.recursive_print(litem, dpth + 1)
-		else:
-			if key:
-				self.output += tabs(dpth) + '[%s] => %s' % (key, src) + "\n"
-			else:
-				self.i = self.i + 1
-				self.output += tabs(dpth) + str(self.i) + ' => %s' % src + "\n"
+                #self.view.replace(edit, region, self.output)
+
+    def enc(self):
+        if self.view.encoding() == 'Undefined':
+            return self.view.settings().get('default_encoding', 'UTF-8')
+        else:
+            return self.view.encoding()
+
+    def recursive_print(self, src, dpth = 0, key = ''):
+        """ Recursively prints nested elements."""
+        tabs = lambda n: '\t' * n * 1 # or 2 or 8 or...
+        brace = lambda s, n: '%s%s%s' % ('['*n, s, ']'*n)
+
+        if isinstance(src, dict):
+            for key, value in src.items():
+                if isinstance(value, dict) or (isinstance(value, list)):
+                    self.output += tabs(dpth) + brace(key, dpth) + "\n"
+                self.recursive_print(value, dpth + 1, key)
+        elif (isinstance(src, list)):
+            self.i = 0
+            for litem in src:
+                self.recursive_print(litem, dpth + 1)
+        else:
+            if key:
+                self.output += tabs(dpth) + '[%s] => %s' % (key, src) + "\n"
+            else:
+                self.i = self.i + 1
+                self.output += tabs(dpth) + str(self.i) + ' => %s' % src + "\n"
 
 
 class ConvertToUrlQuotedCommand(sublime_plugin.TextCommand):
